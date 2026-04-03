@@ -100,6 +100,7 @@ text-align:center;
 font-weight:bold;
 transition:.3s;
 }
+.locked{border:2px dashed #999;color:#999;cursor:not-allowed;background:#111;}
 
 .available{
 border:2px solid var(--success);
@@ -346,6 +347,9 @@ slotsContainer.innerHTML="";
 let date=bookingDate.value;
 if(!date)return;
 
+ let weekId = getWeekId(date);
+ let userWeeklyBooked = getUserWeeklyBookings(currentUser, weekId);
+
 let total=0;
 slots.forEach(s=>{
 let key=`B_${selectedGround}_${date}_${s}`;
@@ -364,19 +368,53 @@ btn.onclick=()=>{localStorage.removeItem(key);renderSlots();}
 div.appendChild(btn);
 }
 }else{
-div.className="slot available";
-div.innerText=s;
-div.onclick=()=>{
-localStorage.setItem(key,currentUser);
-let pts=parseInt(localStorage.getItem("PTS_"+currentUser)||0);
-localStorage.setItem("PTS_"+currentUser,pts+10);
-div.classList.add("flash");
-setTimeout(renderSlots,600);
-};
+ if(userWeeklyBooked>=4){
+ div.className="slot locked";
+ div.innerHTML=`${s}<br><small>Week limit reached</small>`;
+ } else {
+ div.className="slot available";
+ div.innerText=s;
+ div.onclick=()=>{
+ let newTotal = getUserWeeklyBookings(currentUser, weekId);
+ if(newTotal>=4){
+ return alert("Weekly limit reached: maximum 4 bookings per week.");
+ }
+ localStorage.setItem(key,currentUser);
+ let pts=parseInt(localStorage.getItem("PTS_"+currentUser)||0);
+ localStorage.setItem("PTS_"+currentUser,pts+10);
+ div.classList.add("flash");
+ setTimeout(renderSlots,600);
+ };
+ }
 }
 slotsContainer.appendChild(div);
 });
 bookingCount.innerText=total;
+}
+
+function getWeekId(dateStr){
+ // Using Monday as start of week; returns YYYY-WW
+ let d = new Date(dateStr);
+ let dow = (d.getDay()+6)%7;
+ d.setDate(d.getDate()-dow);
+ let y = d.getFullYear();
+ let m = String(d.getMonth()+1).padStart(2,'0');
+ let day = String(d.getDate()).padStart(2,'0');
+ return `${y}-${m}-${day}`;
+}
+
+function getUserWeeklyBookings(user, weekId){
+ if(!user || user==='admin') return 0;
+ let count=0;
+ for(let i=0;i<localStorage.length;i++){
+ let k=localStorage.key(i);
+ if(!k.startsWith('B_')) continue;
+ if(localStorage.getItem(k)!==user) continue;
+ let parts=k.split('_');
+ let bdate=parts[2];
+ if(getWeekId(bdate)===weekId) count++;
+ }
+ return count;
 }
 
 function loadCoaches(){
